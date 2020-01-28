@@ -1,11 +1,14 @@
 // 3d_space_reconstruction.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include <iostream>
+#include "Camera.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    Camera cam{ 0, "Example.txt" };
+    
+    
+
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

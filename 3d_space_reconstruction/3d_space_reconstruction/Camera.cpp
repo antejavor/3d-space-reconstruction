@@ -1,12 +1,35 @@
 #include "Camera.h"
+#include <iostream>
+#include <opencv2/calib3d.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
 
-void Camera::start_callibration_process(int sample_num, double delay, int board_width, int board_height)
+int Camera::get_id() 
+{
+	return id;
+}
+
+void Camera::set_id(int ) 
+{
+	this->id = id;
+}
+
+cv::Mat Camera::get_distortion_coeffs() 
+{
+	return distortion_coeffs;
+}
+
+cv::Mat Camera::get_intrinsic_matrix() 
+{
+	return intrinsic_matrix;
+}
+
+void Camera::calibrate(int sample_num, double delay, int board_width, int board_height)
 {
 	std::cout << "Start of calibration function!\n";
 	int      board_num = board_width * board_height;
 	cv::Size board_size = cv::Size(board_width, board_height);
-
-	cv::VideoCapture capture(camera_id);
+	cv::VideoCapture capture(id);
 	if (!capture.isOpened())
 	{
 		std::cerr << "Couldn't open the camera\n";
@@ -18,7 +41,7 @@ void Camera::start_callibration_process(int sample_num, double delay, int board_
 
 	double   last_captured_timestamp = 0;
 	cv::Size image_size;
-
+	cv::namedWindow("Calibration", cv::WINDOW_FREERATIO);
 	while (image_points.size() < (size_t)sample_num)
 	{
 
@@ -46,9 +69,24 @@ void Camera::start_callibration_process(int sample_num, double delay, int board_
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
+	cv::destroyWindow("Calibration");
+	std::cout << "\n\n*** CALIBRATING THE CAMERA...\n" << std::endl;
+
+	// CALIBRATE THE CAMERA!
+	double err = cv::calibrateCamera(
+		object_points,
+		image_points,
+		image_size,
+		intrinsic_matrix,
+		distortion_coeffs,
+		cv::noArray(),
+		cv::noArray(),
+		cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_PRINCIPAL_POINT
+	);
 }
 
-void Camera::save_camera_properties()
+void Camera::save_properties_to_file(std::string file_name)
 {
+
 
 }
