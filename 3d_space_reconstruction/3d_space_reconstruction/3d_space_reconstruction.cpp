@@ -5,7 +5,13 @@
 
 int main()
 {
-    Camera cam{ 0, "Example.txt" };
+    Camera cam{1};
+
+    cam.calibrate(20, 2, 9, 6);
+    cam.save_properties_to_file("intirsic.xml");
+    cam.load_properties_from_file("intirsic.xml");
+
+    cam.run_calibrated_stream();
     
     
 
