@@ -88,6 +88,8 @@ void Camera::calibrate_form_video(int sample_num, double delay)
 		map2
 	);
 
+	std::cout << "*** DONE! Build undistortion map for video stream!\n";
+
 }
 
 void Camera::save_properties_to_file(std::string file_name_xml)
@@ -120,7 +122,9 @@ void Camera::load_properties_from_file(std::string file_name_xml)
 	std::cout << "\nimage height: " << image_size.height;
 	std::cout << "\nintrinsic matrix:" << intrinsic_matrix;
 	std::cout << "\ndistortion coefficients: " << distortion_coeffs;
-	std::cout << "***DONE! Loading properties from file" << file_name_xml << std::endl;
+	std::cout << "\nmap1:" << map1.size();
+	std::cout << "\nmap2:" << map2.size();
+	std::cout << "\n***DONE! Loading properties from file" << file_name_xml << std::endl;
 	fs.release();
 }
 

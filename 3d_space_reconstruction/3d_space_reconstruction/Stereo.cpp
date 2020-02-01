@@ -6,123 +6,85 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 
-void Stereo::stereo_calibration_and_vision(int sample_num, double delay, int board_width, int board_height)
+void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 {
 	std::cout << "Start of calibration function!\n";
-
+	int board_width = 9;
+	int board_height = 6;
 	int      board_num = board_width * board_height;
 	cv::Size board_size = cv::Size(board_width, board_height);
 	cv::VideoCapture capture_left(camera_left.id);
+	cv::VideoCapture capture_right(camera_right.id);
 
-	if (!capture_left.isOpened())
+	if (!capture_left.isOpened() && !capture_right.isOpened())
 	{
 		std::cerr << "Couldn't open the camera\n";
 		return;
-	}
+	}	
 
+	std::vector<std::vector<cv::Point2f> > image_points_right;
 	std::vector<std::vector<cv::Point2f> > image_points_left;
 	std::vector<std::vector<cv::Point3f> > object_points;
 	cv::Size image_size_left;
 	double   last_captured_timestamp_l = 0;
-	cv::namedWindow("Calibration", cv::WINDOW_FREERATIO);
+	cv::namedWindow("Calibration_left", cv::WINDOW_FREERATIO);
+	cv::namedWindow("Calibration_right", cv::WINDOW_FREERATIO);
+
 	while (image_points_left.size() < (size_t)sample_num)
 	{
 
-		cv::Mat image;
-		capture_left >> image;
-		image_size_left = image.size();
+		cv::Mat image_l, image_r;
+		capture_left >> image_l;
+		capture_right >> image_r;
 
-		std::vector<cv::Point2f> corners;
-		bool found = cv::findChessboardCorners(image, board_size, corners);
-		drawChessboardCorners(image, board_size, corners, found);
+		image_size_left = image_l.size();
+		std::vector<cv::Point2f> corners_l;
+		std::vector<cv::Point2f> corners_r;
+
+		bool found_l = cv::findChessboardCorners(image_l, board_size, corners_l);
+		drawChessboardCorners(image_l, board_size, corners_l, found_l);
+
+		bool found_r = cv::findChessboardCorners(image_r, board_size, corners_r);
+		drawChessboardCorners(image_r, board_size, corners_r, found_r);
 
 		double timestamp = (double)clock() / CLOCKS_PER_SEC;
-		if (found && timestamp - last_captured_timestamp_l > delay)
+		if (found_l && found_r && timestamp - last_captured_timestamp_l > delay)
 		{
-
 			last_captured_timestamp_l = timestamp;
 
-			image_points_left.push_back(corners);
+			image_points_left.push_back(corners_l);
+			image_points_right.push_back(corners_r);
 			object_points.push_back(std::vector<cv::Point3f>());
 			std::vector<cv::Point3f>& opts = object_points.back();
 			opts.resize(board_num);
 			for (int j = 0; j < board_num; j++) {
 				opts[j] = cv::Point3f((float)(j / board_width), (float)(j % board_width), 0.f);
 			}
-			std::cout << "Collected our " << (int)image_points_left.size() <<
+
+			std::cout << "Collected our left: " << (int)image_points_left.size()
+				<< "and right:" << (int)image_points_right.size() <<
 				" of " << sample_num << " needed chessboard images\n" << std::endl;
 		}
-		cv::imshow("Calibration", image);
+		cv::imshow("Calibration_left", image_l);
+		cv::imshow("Calibration_right", image_r);
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
 	capture_left.release();
+	capture_right.release();
 	cv::destroyAllWindows();
-	std::vector<std::vector<cv::Point2f> > image_points_right;
-
-	cv::VideoCapture capture_right(camera_right.id);
-	if (!capture_right.isOpened())
-	{
-		std::cerr << "Couldn't open the camera\n";
-		return;
-	}
-
-	double   last_captured_timestamp = 0;
-	cv::namedWindow("Calibration", cv::WINDOW_FREERATIO);
-	while (image_points_right.size() < (size_t)(sample_num))
-	{
-
-		cv::Mat image;
-		capture_right >> image;
-
-
-		std::vector<cv::Point2f> corners;
-		bool found = cv::findChessboardCorners(image, board_size, corners);
-		drawChessboardCorners(image, board_size, corners, found);
-
-		double timestamp = (double)clock() / CLOCKS_PER_SEC;
-		if (found && timestamp - last_captured_timestamp > delay)
-		{
-
-			last_captured_timestamp = timestamp;
-
-			image_points_right.push_back(corners);
-			object_points.push_back(std::vector<cv::Point3f>());
-			std::vector<cv::Point3f>& opts = object_points.back();
-			opts.resize(board_num);
-			for (int j = 0; j < board_num; j++) {
-				opts[j] = cv::Point3f((float)(j / board_width), (float)(j % board_width), 0.f);
-			}
-			std::cout << "Collected our " << (int)image_points_right.size() <<
-				" of " << sample_num << " needed chessboard images\n" << std::endl;
-		}
-		cv::imshow("Calibration", image);
-		if ((cv::waitKey(30) & 255) == 27)
-			return;
-	}
-	capture_left.release();
-	cv::destroyAllWindows();
-
-	std::vector< std::vector<cv::Point3f> >::iterator row;
-	std::vector<cv::Point3f>::iterator col;
-
-	for (row = object_points.begin(); row != object_points.end(); row++) {
-		for (col = row->begin(); col != row->end(); col++) {
-			std::cout << *col << '\n';
-		}
-	}
 	
-	cv::Mat M1 = cv::Mat::eye(3, 3, CV_64F);
-	cv::Mat M2 = cv::Mat::eye(3, 3, CV_64F);
-	cv::Mat D1, D2, R, T, E, F;
 	std::cout << "\nRunning stereo calibration ...\n";
 	cv::stereoCalibrate(
 		object_points,
 		image_points_left,
 		image_points_right,
-		M1, D1, M2, D2,
+		camera_left.intrinsic_matrix,
+		camera_left.distortion_coeffs,
+		camera_right.intrinsic_matrix,
+		camera_right.distortion_coeffs,
 		image_size_left, R, T, E, F,
-		cv::CALIB_FIX_ASPECT_RATIO,
+		cv::CALIB_USE_INTRINSIC_GUESS,
 		cv::TermCriteria(
 			cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 100, 1e-5
 		)
@@ -130,9 +92,6 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay, int boa
 	);
 	std::cout << "Done\n\n";
 
-
-
-	std::cout << "\n\n*** CALIBRATING THE CAMERA...\n" << std::endl;
 
 	return;
 
