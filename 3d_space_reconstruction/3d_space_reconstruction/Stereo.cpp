@@ -20,7 +20,7 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 	{
 		std::cerr << "Couldn't open the camera\n";
 		return;
-	}	
+	}
 
 	std::vector<std::vector<cv::Point2f> > image_points_right;
 	std::vector<std::vector<cv::Point2f> > image_points_left;
@@ -70,10 +70,8 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
-	capture_left.release();
-	capture_right.release();
 	cv::destroyAllWindows();
-	
+
 	std::cout << "\nRunning stereo calibration ...\n";
 	cv::stereoCalibrate(
 		object_points,
@@ -90,7 +88,78 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 		)
 
 	);
-	std::cout << "Done\n\n";
+	std::cout << "\nRunning stereo rectifiy ...\n";
+
+	stereoRectify(
+		camera_left.intrinsic_matrix,
+		camera_left.distortion_coeffs,
+		camera_left.intrinsic_matrix,
+		camera_left.distortion_coeffs,
+		image_size_left,
+		R, T, rectification_l, rectification_r, projection_l, projection_r,
+		cv::noArray(), cv::CALIB_ZERO_DISPARITY
+	);
+
+	std::cout << "***DONE!\n";
+
+	std::cout << "\nRunning undistort maps ...\n";
+	cv::initUndistortRectifyMap(
+		camera_left.intrinsic_matrix,
+		camera_left.distortion_coeffs,
+		rectification_l, projection_l, image_size_left, CV_16SC2, map_l1, map_l2
+	);
+	cv::initUndistortRectifyMap(
+		camera_right.intrinsic_matrix,
+		camera_right.distortion_coeffs,
+		rectification_r,
+		projection_l, image_size_left, CV_16SC2, map_r1, map_r2
+	);
+	std::cout << "***DONE!\n";
+
+	cv::Mat pair;
+	pair.create(image_size_left.height, image_size_left.width * 2, CV_8UC3);
+	cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
+		-64, 128, 11, 100, 1000,
+		32, 0, 15, 1000, 16,
+		cv::StereoSGBM::MODE_HH);
+
+	while (true) {
+		cv::UMat image_l, image_r;
+		capture_left >> image_l;
+		capture_right >> image_r;
+
+		cv::UMat imgl, imgr, disp, vdisp;
+		cv::remap(image_l, imgl, map_l1, map_l2, cv::INTER_LINEAR);
+		cv::remap(image_r, imgr, map_r1, map_r2, cv::INTER_LINEAR);
+		
+		stereo->compute(imgl, imgr, disp);
+		cv::normalize(disp, vdisp, 0, 256, cv::NORM_MINMAX, CV_8U);
+		cv::imshow("disparity", vdisp);
+
+		cv::Mat part = pair.colRange(0, image_size_left.width);
+		cvtColor(imgl, part, cv::COLOR_BGR2GRAY);
+		part = pair.colRange(image_size_left.width, image_size_left.width * 2);
+		cvtColor(imgr, part, cv::COLOR_BGR2GRAY);
+
+		for (int j = 0; j < image_size_left.height; j += 16)
+			cv::line(
+				pair,
+				cv::Point(0, j),
+				cv::Point(image_size_left.width * 2, j),
+				cv::Scalar(0, 255, 0)
+			);
+
+		cv::imshow("rectified", pair);
+		if ((cv::waitKey(30) & 255) == 27)
+			return;
+	}
+
+	capture_left.release();
+	capture_right.release();
+	cv::destroyAllWindows();
+
+	// Setup for finding stereo corrrespondences
+	 //
 
 
 	return;

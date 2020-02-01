@@ -20,7 +20,7 @@ int main()
     cam_r.load_properties_from_file("cam_r.xml");
     Stereo st{ cam_l, cam_r };
 
-    st.stereo_calibration_and_vision(20, 2);
+    st.stereo_calibration_and_vision(20,2);
 
     
     
