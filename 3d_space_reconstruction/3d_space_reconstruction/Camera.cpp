@@ -5,36 +5,12 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-int Camera::get_id()
-{
-	return id;
-}
-
-void Camera::set_id(int)
-{
-	this->id = id;
-}
-
-cv::Mat Camera::get_distortion_coeffs()
-{
-	return distortion_coeffs;
-}
-
-cv::Mat Camera::get_intrinsic_matrix()
-{
-	return intrinsic_matrix;
-}
-
-cv::Size Camera::get_image_size()
-{
-	return image_size;
-}
-
-void Camera::calibrate(int sample_num, double delay, int board_width, int board_height)
+void Camera::calibrate_form_video(int sample_num, double delay)
 {
 	std::cout << "Start of calibration function!\n";
-
-	int      board_num = board_width * board_height;
+	int board_width = 9;
+	int board_height = 6;
+	int      corners_num = board_width * board_height;
 	cv::Size board_size = cv::Size(board_width, board_height);
 	cv::VideoCapture capture(id);
 	if (!capture.isOpened())
@@ -64,12 +40,11 @@ void Camera::calibrate(int sample_num, double delay, int board_width, int board_
 		{
 
 			last_captured_timestamp = timestamp;
-
 			image_points.push_back(corners);
 			object_points.push_back(std::vector<cv::Point3f>());
 			std::vector<cv::Point3f>& opts = object_points.back();
-			opts.resize(board_num);
-			for (int j = 0; j < board_num; j++) {
+			opts.resize(corners_num);
+			for (int j = 0; j <corners_num; j++) {
 				opts[j] = cv::Point3f((float)(j / board_width), (float)(j % board_width), 0.f);
 			}
 			std::cout << "Collected our " << (int)image_points.size() <<
@@ -82,6 +57,7 @@ void Camera::calibrate(int sample_num, double delay, int board_width, int board_
 	capture.release();
 	cv::destroyAllWindows();
 	std::cout << "\n\n*** CALIBRATING THE CAMERA...\n" << std::endl;
+
 
 	// CALIBRATE THE CAMERA!
 	double err = cv::calibrateCamera(
@@ -117,26 +93,35 @@ void Camera::calibrate(int sample_num, double delay, int board_width, int board_
 void Camera::save_properties_to_file(std::string file_name_xml)
 {
 
-	std::cout << "\nStoring properties to file " << file_name_xml << "\n";
+	std::cout << "Storing properties to file " << file_name_xml << "\n";
 	cv::FileStorage fs(file_name_xml, cv::FileStorage::WRITE);
 
-	fs << "image_width" << image_size.width << "image_height" << image_size.height
-		<< "camera_matrix" << intrinsic_matrix << "distortion_coefficients"
-		<< distortion_coeffs;
+	fs << "image_width" << image_size.width
+		<< "image_height" << image_size.height
+		<< "camera_matrix" << intrinsic_matrix
+		<< "distortion_coefficients" << distortion_coeffs
+		<< "map1" << map1
+		<< "map2" << map2;
 	fs.release();
+	std::cout << "***DONE! Storing properties to file" << file_name_xml << "\n";
 }
 
 void Camera::load_properties_from_file(std::string file_name_xml)
 {
+	std::cout << "Load properties from " << file_name_xml << "\n";
 	cv::FileStorage fs(file_name_xml, cv::FileStorage::READ);
-	std::cout << "\nimage width: " << (int)fs["image_width"];
-	std::cout << "\nimage height: " << (int)fs["image_height"];
-
-	cv::Mat intrinsic_matrix_loaded, distortion_coeffs_loaded;
-	fs["camera_matrix"] >> intrinsic_matrix_loaded;
-	fs["distortion_coefficients"] >> distortion_coeffs_loaded;
-	std::cout << "\nintrinsic matrix:" << intrinsic_matrix_loaded;
-	std::cout << "\ndistortion coefficients: " << distortion_coeffs_loaded << std::endl;
+	fs["image_width"] >> image_size.width;
+	fs["image_height"] >> image_size.height;
+	fs["camera_matrix"] >> intrinsic_matrix;
+	fs["distortion_coefficients"] >> distortion_coeffs;
+	fs["map1"] >> map1;
+	fs["map2"] >> map2;
+	std::cout << "\nimage width: " << image_size.width;
+	std::cout << "\nimage height: " << image_size.height;
+	std::cout << "\nintrinsic matrix:" << intrinsic_matrix;
+	std::cout << "\ndistortion coefficients: " << distortion_coeffs;
+	std::cout << "***DONE! Loading properties from file" << file_name_xml << std::endl;
+	fs.release();
 }
 
 void Camera::run_calibrated_stream() {
@@ -170,3 +155,6 @@ void Camera::run_calibrated_stream() {
 	cv::destroyAllWindows();
 	std::cout << "End stream\n";
 }
+
+
+
