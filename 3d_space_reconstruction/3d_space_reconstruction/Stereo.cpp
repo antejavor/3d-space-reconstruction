@@ -6,13 +6,15 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 
-void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
+void Stereo::stereo_calibration(int sample_num, double delay)
 {
 	std::cout << "Start of calibration function!\n";
 	int board_width = 9;
 	int board_height = 6;
 	int      board_num = board_width * board_height;
 	cv::Size board_size = cv::Size(board_width, board_height);
+
+
 	cv::VideoCapture capture_left(camera_left.id);
 	cv::VideoCapture capture_right(camera_right.id);
 
@@ -70,6 +72,9 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
+
+	capture_left.release();
+	capture_right.release();
 	cv::destroyAllWindows();
 
 	std::cout << "\nRunning stereo calibration ...\n";
@@ -88,6 +93,8 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 		)
 
 	);
+	std::cout << "***DONE!\n";
+
 	std::cout << "\nRunning stereo rectifiy ...\n";
 
 	stereoRectify(
@@ -116,52 +123,108 @@ void Stereo::stereo_calibration_and_vision(int sample_num, double delay)
 	);
 	std::cout << "***DONE!\n";
 
-	cv::Mat pair;
-	pair.create(image_size_left.height, image_size_left.width * 2, CV_8UC3);
+	std::cout << "End of calibration function!\n";
+	return;
+
+}
+
+void Stereo::stereo_SGBM() 
+{
+	cv::VideoCapture capture_left(camera_left.id);
+	cv::VideoCapture capture_right(camera_right.id);
+
 	cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
 		-64, 128, 11, 100, 1000,
 		32, 0, 15, 1000, 16,
 		cv::StereoSGBM::MODE_HH);
 
+	cv::UMat image_l, image_r, imgl, imgr, disp, vdisp;
+
 	while (true) {
-		cv::UMat image_l, image_r;
+
 		capture_left >> image_l;
 		capture_right >> image_r;
 
-		cv::UMat imgl, imgr, disp, vdisp;
 		cv::remap(image_l, imgl, map_l1, map_l2, cv::INTER_LINEAR);
 		cv::remap(image_r, imgr, map_r1, map_r2, cv::INTER_LINEAR);
-		
+
 		stereo->compute(imgl, imgr, disp);
 		cv::normalize(disp, vdisp, 0, 256, cv::NORM_MINMAX, CV_8U);
 		cv::imshow("disparity", vdisp);
 
-		cv::Mat part = pair.colRange(0, image_size_left.width);
-		cvtColor(imgl, part, cv::COLOR_BGR2GRAY);
-		part = pair.colRange(image_size_left.width, image_size_left.width * 2);
-		cvtColor(imgr, part, cv::COLOR_BGR2GRAY);
-
-		for (int j = 0; j < image_size_left.height; j += 16)
-			cv::line(
-				pair,
-				cv::Point(0, j),
-				cv::Point(image_size_left.width * 2, j),
-				cv::Scalar(0, 255, 0)
-			);
-
-		cv::imshow("rectified", pair);
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
 
-	capture_left.release();
-	capture_right.release();
-	cv::destroyAllWindows();
+}
 
-	// Setup for finding stereo corrrespondences
-	 //
+void Stereo::stereo_BM()
+{
+	cv::VideoCapture capture_left(camera_left.id);
+	cv::VideoCapture capture_right(camera_right.id);
+	
+	cv::Ptr<cv::StereoBM> stereo = cv::StereoBM::create();
 
+	cv::Mat image_l, image_r, imgl, imgr, disp, vdisp;
 
-	return;
+	while (true) {
+
+		capture_left >> image_l;
+		capture_right >> image_r;
+
+		cv::remap(image_l, imgl, map_l1, map_l2, cv::INTER_LINEAR);
+		cv::remap(image_r, imgr, map_r1, map_r2, cv::INTER_LINEAR);
+
+		stereo->compute(imgl, imgr, disp);
+		cv::normalize(disp, vdisp, 0, 256, cv::NORM_MINMAX, CV_8U);
+		cv::imshow("disparity", vdisp);
+
+		if ((cv::waitKey(30) & 255) == 27)
+			return;
+	}
+
+}
+
+void Stereo::save_properties_to_file(std::string file_name_xml) 
+{
+	std::cout << "Storing properties to file " << file_name_xml << "\n";
+	cv::FileStorage fs(file_name_xml, cv::FileStorage::WRITE);
+
+	fs << "rotation" << R
+		<< "translation" << T
+		<< "essential" << E
+		<< "fundamental" << F
+		<< "mapl1" << map_l1
+		<< "mapl2" << map_l2
+		<< "mapr1" << map_r1
+		<< "mapr2" << map_r2;
+	fs.release();
+	std::cout << "***DONE! Storing properties to file" << file_name_xml << "\n";
+}
+
+void Stereo::load_properties_from_file(std::string file_name_xml) 
+{
+	std::cout << "Load properties from " << file_name_xml << "\n";
+	cv::FileStorage fs(file_name_xml, cv::FileStorage::READ);
+	fs["rotation"] >> R;
+	fs["translation"] >> T;
+	fs["essential"] >> E;
+	fs["fundamental"] >> F;
+	fs["mapl1"] >> map_l1;
+	fs["mapl2"] >> map_l2;
+	fs["mapr1"] >> map_r1;
+	fs["mapr2"] >> map_r2;
+	fs.release();
+
+	std::cout << "\nrotation: " << R.size;
+	std::cout << "\ntranslation: " << T.size;
+	std::cout << "\nessential" << E.size;
+	std::cout << "\nfundamental: " << F.size;
+	std::cout << "\nmapl1:" << map_l1.size();
+	std::cout << "\nmapl2:" << map_l2.size();
+	std::cout << "\nmapr1:" << map_r1.size();
+	std::cout << "\nmapr2:" << map_r2.size();
+	std::cout << "\n***DONE! Loading properties from file" << file_name_xml << std::endl;
+	
 
 }
