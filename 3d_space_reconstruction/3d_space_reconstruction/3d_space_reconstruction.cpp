@@ -10,8 +10,8 @@ int main()
 	cam_r.load_properties_from_file("cam_r.xml");
 	Stereo st{ cam_l, cam_r };
 
-	st.stereo_calibration(30, 1);
-	st.save_properties_to_file("stereo.xml");
+	/*st.stereo_calibration(30, 1);
+	st.save_properties_to_file("stereo.xml");*/
 	st.load_properties_from_file("stereo.xml");
 	st.stereo_SGBM();
 

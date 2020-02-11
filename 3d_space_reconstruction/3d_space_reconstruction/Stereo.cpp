@@ -5,6 +5,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <iostream>
+#include <chrono>
 
 void Stereo::stereo_calibration(int sample_num, double delay)
 {
@@ -53,7 +54,6 @@ void Stereo::stereo_calibration(int sample_num, double delay)
 		if (found_l && found_r && timestamp - last_captured_timestamp_l > delay)
 		{
 			last_captured_timestamp_l = timestamp;
-
 			image_points_left.push_back(corners_l);
 			image_points_right.push_back(corners_r);
 			object_points.push_back(std::vector<cv::Point3f>());
@@ -72,7 +72,6 @@ void Stereo::stereo_calibration(int sample_num, double delay)
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
-
 	capture_left.release();
 	capture_right.release();
 	cv::destroyAllWindows();
@@ -136,9 +135,9 @@ void Stereo::stereo_SGBM()
 	cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create(
 		-64, 128, 11, 100, 1000,
 		32, 0, 15, 1000, 16,
-		cv::StereoSGBM::MODE_HH);
+		cv::StereoSGBM::MODE_SGBM_3WAY);
 
-	cv::UMat image_l, image_r, imgl, imgr, disp, vdisp;
+	cv::Mat image_l, image_r, imgl, imgr, disp, vdisp;
 
 	while (true) {
 
@@ -148,13 +147,22 @@ void Stereo::stereo_SGBM()
 		cv::remap(image_l, imgl, map_l1, map_l2, cv::INTER_LINEAR);
 		cv::remap(image_r, imgr, map_r1, map_r2, cv::INTER_LINEAR);
 
+		auto start_stereo = std::chrono::high_resolution_clock::now();
 		stereo->compute(imgl, imgr, disp);
+		auto end_stereo = std::chrono::high_resolution_clock::now();
+		auto duration_stereo = std::chrono::duration_cast<std::chrono::milliseconds>(end_stereo - start_stereo).count();
+		std::cout << "\n***Done stereo:  " << duration_stereo;
+
+
 		cv::normalize(disp, vdisp, 0, 256, cv::NORM_MINMAX, CV_8U);
 		cv::imshow("disparity", vdisp);
 
 		if ((cv::waitKey(30) & 255) == 27)
 			return;
 	}
+	capture_left.release();
+	capture_right.release();
+	cv::destroyAllWindows();
 
 }
 
