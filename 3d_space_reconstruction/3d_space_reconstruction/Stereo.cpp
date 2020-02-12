@@ -4,6 +4,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/cudastereo.hpp>
 #include <iostream>
 #include <chrono>
 
@@ -139,6 +140,7 @@ void Stereo::stereo_SGBM()
 
 	cv::Mat image_l, image_r, imgl, imgr, disp, vdisp;
 
+
 	while (true) {
 
 		capture_left >> image_l;
@@ -171,9 +173,9 @@ void Stereo::stereo_BM()
 	cv::VideoCapture capture_left(camera_left.id);
 	cv::VideoCapture capture_right(camera_right.id);
 	
-	cv::Ptr<cv::StereoBM> stereo = cv::StereoBM::create();
+	cv::Ptr<cv::cuda::StereoBM> stereo = cv::cuda::StereoBM::create();
 
-	cv::Mat image_l, image_r, imgl, imgr, disp, vdisp;
+	cv::Mat image_l, image_r, imgl, imgr, vdisp;
 
 	while (true) {
 
@@ -182,6 +184,13 @@ void Stereo::stereo_BM()
 
 		cv::remap(image_l, imgl, map_l1, map_l2, cv::INTER_LINEAR);
 		cv::remap(image_r, imgr, map_r1, map_r2, cv::INTER_LINEAR);
+
+
+		cv::cuda::GpuMat l, r, disp;
+		imgl.copyTo(l);
+		image_r.copyTo(r);
+
+		
 
 		stereo->compute(imgl, imgr, disp);
 		cv::normalize(disp, vdisp, 0, 256, cv::NORM_MINMAX, CV_8U);

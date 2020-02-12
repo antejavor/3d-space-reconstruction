@@ -6,12 +6,17 @@ int main()
 {
 	Camera cam_l{ 2 };
 	Camera cam_r{ 1 };
+	cam_l.calibrate_form_video(10, 1);
+	cam_r.calibrate_form_video(10, 1);
+	cam_l.save_properties_to_file("cam_l.xml");
+	cam_r.save_properties_to_file("cam_r.xml");
+
 	cam_l.load_properties_from_file("cam_l.xml");
 	cam_r.load_properties_from_file("cam_r.xml");
 	Stereo st{ cam_l, cam_r };
 
-	/*st.stereo_calibration(30, 1);
-	st.save_properties_to_file("stereo.xml");*/
+	st.stereo_calibration(30, 1);
+	st.save_properties_to_file("stereo.xml");
 	st.load_properties_from_file("stereo.xml");
 	st.stereo_SGBM();
 
